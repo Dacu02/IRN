@@ -17,7 +17,7 @@
 import os
 
 from pathlib import Path
-
+from launch.actions import ExecuteProcess, TimerAction
 from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription
@@ -84,7 +84,8 @@ def generate_launch_description():
     ignition_gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([ign_gazebo_launch]),
         launch_arguments=[
-            ('ign_args', [LaunchConfiguration('world'),
+            ('ign_args', ['-r ',
+                          LaunchConfiguration('world'),
                           '.sdf',
                           ' -v 4',
                           ' --gui-config ',
@@ -104,10 +105,29 @@ def generate_launch_description():
                             '/clock' + '@rosgraph_msgs/msg/Clock' + '[ignition.msgs.Clock'
                         ])
 
+    pause_gazebo = ExecuteProcess(
+        cmd=[
+            'ign', 'service', '-s', 
+            ['/world/', LaunchConfiguration('world'), '/control'], 
+            '--reqtype', 'ignition.msgs.WorldControl', 
+            '--timeout', '2000',
+            '--reptype', 'ignition.msgs.Boolean', 
+            '--req', 'pause: true'
+        ],
+        output='screen'
+    )   
+
+    # Ritarda il comando di pausa di tot secondi
+    delayed_pause = TimerAction(
+        period=10.0,  # Regola questo tempo in base a quanto ci mette il tuo PC a caricare
+        actions=[pause_gazebo]
+    )
+
     # Create launch description and add actions
     ld = LaunchDescription(ARGUMENTS)
     ld.add_action(ign_resource_path)
     ld.add_action(ign_gui_plugin_path)
     ld.add_action(ignition_gazebo)
     ld.add_action(clock_bridge)
+    ld.add_action(delayed_pause)
     return ld
